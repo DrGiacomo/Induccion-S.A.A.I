@@ -1,0 +1,1 @@
+#poner aqui los from referenciando a los views, hay que crear mas view por cada crud, despues este archivo se referencia en urls
