@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+env/
+
+# Django
+*.sqlite3
+media/
+
+# VS Code
+.vscode/
+
+# Node (cuando llegue Vue)
+node_modules/
+dist/
