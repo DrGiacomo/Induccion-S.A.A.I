@@ -1,35 +1,47 @@
-@import './base.css';
+@import 'tailwindcss';
+@import 'primeicons/primeicons.css';
 
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
+/*
+  S.A.A.I — estilos base
+
+  Modo oscuro por clase y no por preferencia del sistema: así el usuario
+  puede elegir y la elección se recuerda. Con `prefers-color-scheme` a secas
+  no hay forma de darle un interruptor.
+*/
+@custom-variant oscuro (&:where(.oscuro, .oscuro *));
+
+@theme {
+  /* Azul de trabajo, legible sobre claro y sobre oscuro */
+  --color-saai-50:  #eef4ff;
+  --color-saai-100: #d9e6ff;
+  --color-saai-200: #bcd3ff;
+  --color-saai-300: #8eb6ff;
+  --color-saai-400: #588fff;
+  --color-saai-500: #3168fb;
+  --color-saai-600: #1b48f0;
+  --color-saai-700: #1637dd;
+  --color-saai-800: #182fb3;
+  --color-saai-900: #1a2e8d;
+
+  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
-a,
-.green {
-  text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+html, body, #app {
+  height: 100%;
 }
 
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
+body {
+  @apply bg-slate-50 text-slate-800 antialiased;
 }
 
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
+.oscuro body {
+  @apply bg-slate-900 text-slate-100;
+}
 
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
-  }
+/* Que el foco del teclado se vea siempre. Quitarlo por estética deja el
+   sistema inutilizable para quien navega sin ratón — y el buscador se va a
+   usar mucho más con el teclado que con el ratón. */
+:focus-visible {
+  outline: 2px solid var(--color-saai-500);
+  outline-offset: 2px;
 }
