@@ -8,10 +8,12 @@ y nada más.
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/', include('usuarios.urls')),
+    path('api/', include('contenido.urls')),
 ]
 
 # Servir los archivos subidos durante el desarrollo.
@@ -23,6 +25,7 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-# Las rutas de la API llegan en la Fase 1, cuando exista con qué protegerlas.
-# Publicar endpoints antes de tener permisos es justo lo que dejó la API
-# abierta de par en par la primera vez.
+# Los endpoints nacen cerrados: `DEFAULT_PERMISSION_CLASSES` en settings.py
+# exige sesión en todo salvo donde se diga lo contrario explícitamente. Solo
+# hay dos excepciones, y están declaradas a la vista en `usuarios/urls.py`:
+# `auth/csrf/` y `auth/login/`, que no podrían funcionar de otro modo.

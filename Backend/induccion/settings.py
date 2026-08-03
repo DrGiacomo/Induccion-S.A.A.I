@@ -209,18 +209,108 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Nunca usar CORS_ALLOW_ALL_ORIGINS: abriría la API a cualquier página.
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS')
 
-# ⚠️ Configuración muerta, a la espera de P1.1 y P1.2.
+# ─────────────────────────────────────────────────────────────────────
+#  API REST  (P1.1)
+# ─────────────────────────────────────────────────────────────────────
+#  `DEFAULT_PERMISSION_CLASSES` es EL candado, y es lo que faltaba.
 #
-#    Declara JWT como forma de autenticarse, pero NO existe ningún endpoint
-#    que emita tokens, así que hoy no autentica a nadie. Y lo más grave:
-#    **falta `DEFAULT_PERMISSION_CLASSES`**, y en DRF declarar *cómo* se
-#    autentica alguien no impone *que tenga* que hacerlo. El resultado es
-#    que la API está abierta de par en par.
+#  En DRF, declarar *cómo* se autentica alguien (`AUTHENTICATION_CLASSES`)
+#  no impone *que tenga* que hacerlo. Son dos cosas distintas, y sin la
+#  segunda la primera es decorativa. Hasta ahora la API entera estaba
+#  abierta: cualquiera podía hacer `DELETE /api/perfiles/1/` desde el
+#  navegador, sin sesión.
 #
-#    P1.1 pone el candado; P1.2 sustituye JWT por sesiones con cookie
-#    HttpOnly (decisión D2).
+#  Se pone aquí y no endpoint por endpoint a propósito: así todo lo que se
+#  construya de ahora en adelante **nace cerrado**, en vez de nacer abierto
+#  y depender de que alguien se acuerde de protegerlo. Abrir algo pasa a
+#  ser un acto deliberado y visible en el código.
+# ─────────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
     ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 25,
+    'DEFAULT_FILTER_BACKENDS': (
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ),
+    # Límite de peticiones (P1.9). El del login es el que importa: sin él,
+    # probar contraseñas al azar sale gratis y solo cuesta tiempo de máquina.
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.ScopedRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '10/min',        # 10 intentos por minuto y por IP
+        'escritura': '120/min',
+    },
+    # El navegador de la API es cómodo en desarrollo y una fuga de
+    # información en producción: enseña la forma de cada endpoint.
+    'DEFAULT_RENDERER_CLASSES': (
+        ['rest_framework.renderers.JSONRenderer',
+         'rest_framework.renderers.BrowsableAPIRenderer']
+        if DEBUG else
+        ['rest_framework.renderers.JSONRenderer']
+    ),
 }
+
+
+# ─────────────────────────────────────────────────────────────────────
+#  Sesiones y CSRF  (P1.2)
+# ─────────────────────────────────────────────────────────────────────
+#  Sesiones con cookie en vez de JWT (decisión D2). El motivo es concreto:
+#  un token guardado en `localStorage` es legible por cualquier JavaScript
+#  que llegue a ejecutarse en la página. Una cookie `HttpOnly` no lo es —
+#  el navegador la envía sola y el script no puede tocarla.
+#
+#  JWT solo ganaría si algún día hubiera una app móvil aparte. No la hay,
+#  y el §2 no la contempla.
+# ─────────────────────────────────────────────────────────────────────
+SESSION_COOKIE_HTTPONLY = True          # el JavaScript no puede leerla
+SESSION_COOKIE_SAMESITE = 'Lax'         # no viaja desde otros sitios
+SESSION_COOKIE_AGE = 60 * 60 * 8        # 8 horas: una jornada laboral
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_SAVE_EVERY_REQUEST = True       # trabajar renueva la sesión
+
+CSRF_COOKIE_HTTPONLY = False            # el frontend SÍ debe leer esta
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_TRUSTED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS')
+
+# Sin esto el navegador no manda la cookie de sesión a la API.
+CORS_ALLOW_CREDENTIALS = True
+
+# En producción, las dos cookies solo viajan por HTTPS.
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+
+# ─────────────────────────────────────────────────────────────────────
+#  Endurecimiento  (P1.9)
+# ─────────────────────────────────────────────────────────────────────
+#  Casi todo esto solo se activa fuera de desarrollo. Forzar HTTPS en local
+#  rompería el trabajo diario sin protegerte de nada.
+# ─────────────────────────────────────────────────────────────────────
+
+# El navegador no adivina el tipo de un archivo: usa el que se le declara.
+# Sin esto, un .txt con HTML dentro puede acabar ejecutándose como página.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Nadie puede meter S.A.A.I dentro de un iframe suyo para engañar a un
+# usuario y hacerle pulsar cosas que no ve (clickjacking).
+X_FRAME_OPTIONS = 'DENY'
+
+# No filtrar la URL completa —que puede llevar lo que alguien buscó— a
+# sitios externos al hacer clic en un enlace.
+SECURE_REFERRER_POLICY = 'same-origin'
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000          # un año
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    # Detrás de nginx o de un balanceador, así es como Django se entera de
+    # que la petición original venía por HTTPS.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

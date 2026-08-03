@@ -8,40 +8,92 @@ fueran la misma cosa —que es lo que pasaba antes, cuando solo existía
 mencionan*, no *una respuesta*.
 """
 
-import os
-
-from django.core.exceptions import ValidationError
-from django.core.validators import FileExtensionValidator
 from django.db import models
 
 from comun.modelos import ContenidoPublicable, EstadoContenido, ModeloBase
+from comun.permisos import area_a_cargo, es_admin, ids_areas_del_usuario
 from usuarios.models import Area
 
-# Extensiones que no se aceptan nunca. Una biblioteca de empresa que reparte
-# ejecutables deja de ser una biblioteca y pasa a ser un vector de contagio.
-#
-# OJO: esto es la primera barrera, no la única. Filtrar por extensión es
-# trivial de burlar renombrando el archivo; la validación por contenido real
-# llega en P1.9. Aquí se para lo evidente y nada más.
-EXTENSIONES_BLOQUEADAS = {
-    "exe", "bat", "cmd", "com", "cpl", "scr", "pif", "msi", "msp",
-    "jar", "js", "jse", "vbs", "vbe", "wsf", "wsh", "ps1", "psm1",
-    "sh", "reg", "dll", "hta", "lnk",
-}
 
-# 50 MB. Cubre el 99 % de lo que existe en una empresa: un PDF escaneado de
-# 100 páginas ronda los 20 MB. El video no se aloja, se enlaza (F-CON-18).
-TAMANO_MAXIMO_BYTES = 50 * 1024 * 1024
+class ContenidoQuerySet(models.QuerySet):
+    """
+    El filtro de visibilidad por área. **Esto es P1.4 y es el corazón de los
+    permisos del proyecto.**
+
+    Se implementa como método de consulta y no como comprobación en la vista
+    por una razón que no es de estilo: así el contenido prohibido **no sale
+    del servidor**. Filtrar después —en el serializer o, peor, en el
+    frontend— significa que el dato ya viajó, y entonces ya se filtró en el
+    otro sentido de la palabra.
+
+    Las tres reglas, en orden:
+
+    1. **Administrador**: lo ve todo, incluidos los borradores.
+    2. **Jefe de área**: todo lo suyo (borradores incluidos, porque los tiene
+       que revisar) más lo que vería cualquiera.
+    3. **Cualquiera con sesión**: solo lo publicado, y de eso:
+       - lo transversal (sin áreas dueñas),
+       - lo de sus propias áreas,
+       - y lo de **otras** áreas **solo si su definición es pública** — que
+         es lo que hace posible P4: verlo con candado y saber a quién pedir
+         acceso, en vez de un vacío mudo.
+
+    Lo que **nunca** aparece: contenido de otra área con la definición marcada
+    como no pública. De eso ni se sabe que existe.
+    """
+
+    def visibles_para(self, usuario):
+        if not usuario or not usuario.is_authenticated:
+            return self.none()
+
+        if es_admin(usuario):
+            return self
+
+        mis_areas = ids_areas_del_usuario(usuario)
+        publicado = models.Q(estado=EstadoContenido.PUBLICADO)
+
+        transversal = models.Q(areas__isnull=True)
+        propio = models.Q(areas__in=mis_areas) if mis_areas else models.Q(pk__in=[])
+        ajeno = self.model.filtro_ajeno_visible()
+
+        visible = publicado & (transversal | propio | ajeno)
+
+        propia = area_a_cargo(usuario)
+        if propia:
+            # El jefe ve TODO lo de su área, borradores incluidos: si no,
+            # no podría revisar lo que la ingesta le propone (P1).
+            visible |= models.Q(areas=propia)
+
+        return self.filter(visible).distinct()
+
+# La validación de archivos vive en `comun/archivos.py` (P1.9). Comprueba la
+# extensión, el tamaño y —lo que de verdad importa— **los primeros bytes**:
+# renombrar `virus.exe` a `manual.pdf` burla cualquier control por extensión,
+# porque la extensión la escribe quien sube el archivo.
+from comun.archivos import TAMANO_MAXIMO as TAMANO_MAXIMO_BYTES  # noqa: E402
+from comun.archivos import validar_archivo  # noqa: E402
 
 
-def validar_archivo(archivo):
-    """Freno mínimo en el modelo. La validación seria es P1.9."""
-    extension = os.path.splitext(archivo.name)[1].lower().lstrip(".")
-    if extension in EXTENSIONES_BLOQUEADAS:
-        raise ValidationError(f"No se aceptan archivos «.{extension}» por seguridad.")
-    if archivo.size > TAMANO_MAXIMO_BYTES:
-        mb = TAMANO_MAXIMO_BYTES // (1024 * 1024)
-        raise ValidationError(f"El archivo supera el máximo de {mb} MB.")
+class CargoQuerySet(models.QuerySet):
+    """
+    Los cargos son más simples: pertenecen a **un** área, no a varias.
+
+    Y son deliberadamente más abiertos. Saber que existe el cargo de
+    "Auxiliar de Bodega" y qué hace no es información sensible — es
+    justamente lo que un recién llegado necesita para entender la empresa.
+    Lo que se protege son los términos y los documentos, no el organigrama.
+    """
+
+    def visibles_para(self, usuario):
+        if not usuario or not usuario.is_authenticated:
+            return self.none()
+        if es_admin(usuario):
+            return self
+        visible = models.Q(estado=EstadoContenido.PUBLICADO)
+        propia = area_a_cargo(usuario)
+        if propia:
+            visible |= models.Q(area=propia)     # el jefe ve sus borradores
+        return self.filter(visible).distinct()
 
 
 class Cargo(ContenidoPublicable):
@@ -92,6 +144,8 @@ class Cargo(ContenidoPublicable):
         related_name="cargos",
         verbose_name="Documentos que debe leer",
     )
+
+    objects = CargoQuerySet.as_manager()
 
     class Meta:
         db_table = "cargo"
@@ -173,6 +227,20 @@ class Termino(ContenidoPublicable):
         help_text="Vacío = transversal, lo ve toda la empresa.",
     )
 
+    objects = ContenidoQuerySet.as_manager()
+
+    @staticmethod
+    def filtro_ajeno_visible():
+        """
+        Un término de otra área aparece **solo si su definición es pública**.
+
+        Si el jefe marcó la definición como no pública, el término es
+        invisible del todo para el resto: ni se sabe que existe. Es la
+        excepción deliberada a P4, para los casos en que hasta el nombre del
+        concepto sea sensible.
+        """
+        return models.Q(definicion_es_publica=True)
+
     class Meta:
         db_table = "termino"
         verbose_name = "Término"
@@ -189,6 +257,35 @@ class Termino(ContenidoPublicable):
     def es_transversal(self) -> bool:
         """Sin áreas dueñas: pertenece a toda la empresa."""
         return not self.areas.exists()
+
+    def puede_ver_detalle(self, usuario) -> bool:
+        """
+        ¿Este usuario tiene derecho a la **capa restringida**?
+
+        Ojo con la diferencia: `visibles_para` decide si el término aparece
+        en la lista; esto decide si además se le enseña el detalle. Un
+        término puede ser visible y estar bloqueado a la vez — es
+        exactamente el caso del candado (P4).
+        """
+        if es_admin(usuario):
+            return True
+        if self.es_transversal:
+            return True
+        mis_areas = ids_areas_del_usuario(usuario)
+        return bool(mis_areas & set(self.areas.values_list("id", flat=True)))
+
+    def encargado(self):
+        """
+        A quién pedirle acceso. Es lo que impide el callejón sin salida (P4).
+
+        Devuelve el jefe de la primera área dueña que tenga uno. Sin esto, el
+        usuario bloqueado vuelve a preguntarle a gente al azar, que es
+        justamente lo que el sistema vino a evitar.
+        """
+        for area in self.areas.select_related("jefe").all():
+            if area.jefe_id:
+                return area.jefe
+        return None
 
 
 class Sinonimo(ModeloBase):
@@ -292,6 +389,26 @@ class Documento(ContenidoPublicable):
         help_text="Para video, que se enlaza y no se aloja.",
     )
 
+    objects = ContenidoQuerySet.as_manager()
+
+    @staticmethod
+    def filtro_ajeno_visible():
+        """
+        Un documento de otra área **sí se ve en las listas**: su nombre, su
+        área y quién lo custodia. Lo que no se puede es abrirlo.
+
+        Es la metáfora de la biblioteca que eligió el autor: ves los pasillos
+        cerrados y sabes a quién pedirle la llave, en vez de creer que el
+        pasillo no existe (P4).
+
+        ⚠️ `pk__isnull=False` y no `Q()` a secas. Un `Q()` vacío **no
+        significa "siempre verdadero"**: significa "sin condición", y al
+        combinarlo con `|` Django simplemente lo descarta. El resultado era
+        que los documentos ajenos desaparecían en vez de aparecer con
+        candado. Lo cazó la prueba `test_el_archivo_de_otra_area_no_viaja`.
+        """
+        return models.Q(pk__isnull=False)
+
     class Meta:
         db_table = "documento"
         verbose_name = "Documento"
@@ -304,6 +421,27 @@ class Documento(ContenidoPublicable):
     @property
     def es_transversal(self) -> bool:
         return not self.areas.exists()
+
+    def puede_ver_detalle(self, usuario) -> bool:
+        """
+        Para un documento, "ver el detalle" es **poder descargarlo**.
+
+        A diferencia del término, un documento no tiene capa pública: o se
+        tiene acceso al archivo o no. Lo que sí se muestra siempre es que
+        existe y de quién es, para no dejar a nadie sin saber a quién pedir.
+        """
+        if es_admin(usuario):
+            return True
+        if self.es_transversal:
+            return True
+        mis_areas = ids_areas_del_usuario(usuario)
+        return bool(mis_areas & set(self.areas.values_list("id", flat=True)))
+
+    def encargado(self):
+        for area in self.areas.select_related("jefe").all():
+            if area.jefe_id:
+                return area.jefe
+        return None
 
     def archivar_y_reemplazar(self, nuevo: "Documento", usuario=None):
         """
