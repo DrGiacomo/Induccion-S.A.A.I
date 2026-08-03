@@ -1,23 +1,28 @@
 """
-URL configuration for induccion project.
+Rutas del proyecto S.A.A.I.
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+Las rutas de cada app viven dentro de la app, no aquí. Este archivo reparte
+y nada más.
 """
+
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include("app1.urls")),  # agregamos api/
 ]
+
+# Servir los archivos subidos durante el desarrollo.
+#
+# Django hace esto SOLO con DEBUG=True, y es correcto que así sea: este
+# servidor es lento y no está pensado para aguantar tráfico. En producción
+# los sirve nginx o el bucket. Sin estas dos líneas los documentos se suben
+# pero no se pueden abrir, que es exactamente lo que pasaba antes de P0.9.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Las rutas de la API llegan en la Fase 1, cuando exista con qué protegerlas.
+# Publicar endpoints antes de tener permisos es justo lo que dejó la API
+# abierta de par en par la primera vez.

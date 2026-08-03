@@ -55,11 +55,32 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    'app1.apps.App1Config',
+
+    # Terceros
     'rest_framework',
     'corsheaders',
+
+    # Propias (P0.5). Cada una con sus modelos, sus rutas y sus migraciones,
+    # en vez de las 9 entidades apiladas en una sola app llamada `app1`.
+    'usuarios',      # quién es cada quien, áreas, pertenencias
+    'contenido',     # términos, cargos, documentos
+    'busqueda',      # índice, historial, contadores
+    'reportes',      # dashboard y certificados (Fase 5)
 ]
+
+
+# ─────────────────────────────────────────────────────────────────────
+#  Modelo de usuario propio  (P0.6)
+# ─────────────────────────────────────────────────────────────────────
+#  Esta línea es la decisión más irreversible del proyecto. Django crea las
+#  tablas de permisos apuntando al modelo que esté declarado aquí en el
+#  momento de la PRIMERA migración; cambiarlo después obliga a rehacer la
+#  base. Se declaró con la base vacía, que es el momento más barato posible.
+#
+#  Absorbe el antiguo `perfildb`: cédula, teléfono y tipo de identificación
+#  viven dentro del usuario, no en una tabla colgando por OneToOne.
+# ─────────────────────────────────────────────────────────────────────
+AUTH_USER_MODEL = 'usuarios.Usuario'
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware', 
@@ -129,12 +150,17 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+# Español de Colombia. Antes estaba en `en-us` / `UTC`, lo que hacía que
+# toda fecha se mostrara con cinco horas de desfase — suficiente para que
+# cualquier reporte del dashboard mintiera sin que se notara (P0.9).
+LANGUAGE_CODE = 'es-co'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Bogota'
 
 USE_I18N = True
 
+# Las fechas se guardan en UTC y se muestran en la zona de arriba. Es lo
+# correcto: si la empresa abre una sede en otro huso, nada se rompe.
 USE_TZ = True
 
 
@@ -142,6 +168,39 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+
+# ─────────────────────────────────────────────────────────────────────
+#  Archivos subidos  (P0.9)
+# ─────────────────────────────────────────────────────────────────────
+#  Antes faltaban las dos líneas de abajo, y la consecuencia era que los
+#  archivos se subían pero **no se podían abrir**. Una biblioteca donde no
+#  se puede abrir el libro no es una biblioteca.
+#
+#  El binario va al disco; a la base solo su registro (P9).
+#
+#  `STORAGES` es la costura que permite mudarse a un bucket sin tocar una
+#  sola línea del código que sube archivos: el día que haga falta se cambia
+#  el backend de `default` y ya. Si alguien construye rutas a mano en vez de
+#  usar el campo del modelo, se rompe el truco y toca reescribirlo todo.
+# ─────────────────────────────────────────────────────────────────────
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+}
+
+# Tope de lo que se acepta en una sola petición. El límite real por archivo
+# vive en el modelo `Documento`; esto es el freno de la capa de arriba.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800   # 50 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880    # 5 MB en RAM; lo mayor va a disco
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -150,8 +209,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Nunca usar CORS_ALLOW_ALL_ORIGINS: abriría la API a cualquier página.
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS')
 
+# ⚠️ Configuración muerta, a la espera de P1.1 y P1.2.
+#
+#    Declara JWT como forma de autenticarse, pero NO existe ningún endpoint
+#    que emita tokens, así que hoy no autentica a nadie. Y lo más grave:
+#    **falta `DEFAULT_PERMISSION_CLASSES`**, y en DRF declarar *cómo* se
+#    autentica alguien no impone *que tenga* que hacerlo. El resultado es
+#    que la API está abierta de par en par.
+#
+#    P1.1 pone el candado; P1.2 sustituye JWT por sesiones con cookie
+#    HttpOnly (decisión D2).
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+        'rest_framework.authentication.SessionAuthentication',
+    ),
 }
