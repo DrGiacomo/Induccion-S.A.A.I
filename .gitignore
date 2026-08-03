@@ -24,6 +24,25 @@ Backend/media/
 repositorio/
 Backend/repositorio/
 
+# ── REGLA DE ORO: nada sensible ni de otros proyectos ──────────
+# Nada que sea secreto, peligroso, de un cliente, o material de otro
+# proyecto entra a este repositorio. Si hay duda, NO se sube.
+# Se revisa `git status` antes de cada commit.
+
+# Material heredado de otros proyectos (MILA, Copiloto de Revit):
+# codigo de produccion ajeno y contexto de negocio de terceros.
+Docs/IA/
+
+# Documentos con datos reales de una empresa o de personas
+Docs/privado/
+Docs/**/confidencial*
+*credenciales*
+*password*
+*.pem
+*.key
+*.p12
+*.pfx
+
 # ── Node / Vue ─────────────────────────────────────────────────
 node_modules/
 dist/
