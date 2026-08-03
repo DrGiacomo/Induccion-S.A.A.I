@@ -38,6 +38,9 @@ Backend/repositorio/
 Docs/
 curva/
 
+# Configuracion local de Claude Code (comandos, ajustes)
+.claude/
+
 # Documentos con datos reales de una empresa o de personas
 *confidencial*
 *credenciales*
