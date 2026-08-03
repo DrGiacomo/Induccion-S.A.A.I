@@ -28,14 +28,18 @@ Backend/repositorio/
 # Nada que sea secreto, peligroso, de un cliente, o material de otro
 # proyecto entra a este repositorio. Si hay duda, NO se sube.
 # Se revisa `git status` antes de cada commit.
+#
+# Este repositorio contiene UNICAMENTE codigo fuente.
+# Decidido el 2026-08-02 por el autor.
 
-# Material heredado de otros proyectos (MILA, Copiloto de Revit):
-# codigo de produccion ajeno y contexto de negocio de terceros.
-Docs/IA/
+# TODA la documentacion queda fuera: biblia, features, plan, avance,
+# bitacora, y el material heredado de otros proyectos (MILA, Copiloto
+# de Revit). Vive solo en el disco del autor.
+Docs/
+curva/
 
 # Documentos con datos reales de una empresa o de personas
-Docs/privado/
-Docs/**/confidencial*
+*confidencial*
 *credenciales*
 *password*
 *.pem
