@@ -1,8 +1,8 @@
 # ═══════════════════════════════════════════════════════════════
 #  S.A.A.I — Dependencias del backend
 # ═══════════════════════════════════════════════════════════════
-#  Generado en el paso P0.2 el 2026-08-02
-#  Python 3.14.4
+#  Actualizado en P0.4 el 2026-08-02
+#  Python 3.14.4  ·  PostgreSQL 17
 #
 #  Instalar:
 #      python -m venv venv
@@ -26,28 +26,25 @@ django-environ==0.14.0
 
 
 # ── Base de datos ──────────────────────────────────────────────
-# ⚠️ TEMPORAL — los tres desaparecen en P0.4 (migración a PostgreSQL,
-#    decisión D1). Entonces entra `psycopg[binary]`.
+# PostgreSQL, decisión D1. Es tecnología constitutiva del proyecto: la
+# búsqueda con stemming en español y la tolerancia a errores de tipeo
+# dependen de capacidades suyas que no son portables a otro motor.
 #
-# ⚠️ Hay DOS drivers de MySQL instalados a la vez:
-#      - mysqlclient  → el MySQLdb real, compilado, el que debería usarse
-#      - PyMySQL      → un sustituto en Python puro
-#    Y `manage.py:5-6` llama a `pymysql.install_as_MySQLdb()`, que hace
-#    que PyMySQL suplante a mysqlclient. Resultado: por manage.py corre
-#    PyMySQL, pero por WSGI/ASGI correría mysqlclient. Driver distinto en
-#    desarrollo y en producción, que es una fuente clásica de fallos
-#    sutiles. Se resuelve solo al pasar a PostgreSQL.
-mysqlclient==2.2.8
-PyMySQL==1.1.3
-cryptography==48.0.0
+# `psycopg[binary]` trae las librerías compiladas: no hace falta tener
+# un compilador de C ni las cabeceras de PostgreSQL en la máquina.
+psycopg[binary]==3.3.4
 
-
-# ── Autenticación ──────────────────────────────────────────────
-# ⚠️ TEMPORAL — se retira en P1.2. Está declarado en settings.py como
-#    clase de autenticación por defecto pero NO tiene endpoints de token,
-#    así que hoy no autentica a nadie. Se decidió sesiones con cookie
-#    HttpOnly en su lugar (decisión D2).
-djangorestframework_simplejwt==5.5.1
+# Retirados en P0.4, cuando murió MySQL:
+#   mysqlclient, PyMySQL  → los dos drivers que se pisaban entre sí, más
+#                           el parche `pymysql.install_as_MySQLdb()` de
+#                           manage.py que hacía que por manage.py corriera
+#                           uno y por WSGI el otro.
+#
+# Retirado en P0.4, adelantando P1.2:
+#   djangorestframework_simplejwt → declaraba JWT como autenticación por
+#                           defecto sin tener un solo endpoint que emitiera
+#                           tokens. Se decidió sesiones con cookie HttpOnly
+#                           (decisión D2).
 
 
 # ── Transitivas ────────────────────────────────────────────────
@@ -55,6 +52,8 @@ djangorestframework_simplejwt==5.5.1
 # para que una instalación futura reproduzca exactamente este entorno.
 asgiref==3.11.1
 cffi==2.0.0
+cryptography==48.0.0
+psycopg-binary==3.3.4
 pycparser==3.0
 PyJWT==2.12.1
 sqlparse==0.5.5
