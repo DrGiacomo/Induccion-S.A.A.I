@@ -18,6 +18,6 @@ from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
-    path('admin/', admin.site.urls),#el user el persona(en español perro) el correo es persona@gmail.com, contraseña 1-9
-    path('', include("app1.urls"))
+    path('admin/', admin.site.urls),
+    path('api/', include("app1.urls")),  # agregamos api/
 ]

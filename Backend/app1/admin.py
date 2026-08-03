@@ -40,8 +40,8 @@ class trabajadorAdmin(admin.ModelAdmin):
 
 @admin.register(repodb)
 class repoAdmin(admin.ModelAdmin):
-    fields=["arhivo","id_area"]
-    list_display=["arhivo","id_area"]
+    fields=["archivo","id_area"]
+    list_display=["archivo","id_area"]
 
 @admin.register(evaluaciondb)
 class evaluacionAdmin(admin.ModelAdmin):

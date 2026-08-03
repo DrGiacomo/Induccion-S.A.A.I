@@ -1,19 +1,59 @@
-# Python
+# ── Python / Django ────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-.env
 venv/
 env/
+.venv/
 
-# Django
+# Secretos — NUNCA versionar. Ver Docs/PLAN_PASO_A_PASO.md P0.3
+.env
+.env.local
+*.env
+!.env.example
+
+# Base de datos local
 *.sqlite3
+*.sqlite3-journal
+
+# Archivos subidos por los usuarios (P9 de la biblia: el archivo va al
+# disco, a la base va el registro. Ninguno de los dos va a git)
 media/
+Backend/media/
+repositorio/
+Backend/repositorio/
 
-# VS Code
-.vscode/
-
-# Node (cuando llegue Vue)
+# ── Node / Vue ─────────────────────────────────────────────────
 node_modules/
 dist/
+dist-ssr/
+*.local
+.vite/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Editores ───────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Sistema operativo ──────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# ── Temporales ─────────────────────────────────────────────────
+*.tmp
+*.bak
+~$*
