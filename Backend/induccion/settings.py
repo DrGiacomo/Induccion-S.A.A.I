@@ -12,20 +12,38 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 
+import environ
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# ─────────────────────────────────────────────────────────────────────
+#  Configuración por entorno  (P0.3)
+# ─────────────────────────────────────────────────────────────────────
+#  Ningún secreto vive en este archivo. Todos se leen de `Backend/.env`,
+#  que no se versiona. La plantilla con los nombres —sin valores— está
+#  en `Backend/.env.example`, que sí se versiona.
+#
+#  Por qué: este archivo va a git, y lo que va a git es público para
+#  siempre aunque se borre después. Este proyecto ya tuvo una contraseña
+#  real publicada; la historia se limpió en P0.1.
+# ─────────────────────────────────────────────────────────────────────
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'ELIMINADO-DE-LA-HISTORIA'#cambiar la llave de seguridad  despues
+env = environ.Env(
+    DEBUG=(bool, False),                  # si falta la variable, se asume producción
+    ALLOWED_HOSTS=(list, []),
+    CORS_ALLOWED_ORIGINS=(list, []),
+)
+environ.Env.read_env(BASE_DIR / '.env')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Sin valor por defecto a propósito: si falta SECRET_KEY, el proyecto no
+# arranca. Es preferible a arrancar en silencio con una clave conocida.
+SECRET_KEY = env('SECRET_KEY')
 
-ALLOWED_HOSTS = []
+DEBUG = env('DEBUG')
+
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
 
 # Application definition
@@ -77,15 +95,15 @@ WSGI_APPLICATION = 'induccion.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# La conexión completa viaja en una sola variable, DATABASE_URL, con el
+# formato  motor://usuario:clave@servidor:puerto/base .
+#
+# Se usa una cadena única en vez de cinco claves sueltas porque es lo que
+# esperan los servicios de nube, y porque cambiar de motor —o de servidor—
+# pasa a ser una sola línea del `.env`. En P0.4, migrar a PostgreSQL será
+# exactamente eso: cambiar `mysql://` por `postgres://`.
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'induccion',
-        'USER': 'root',
-        'PASSWORD': 'ELIMINADO-DE-LA-HISTORIA',
-        'HOST': 'localhost',
-        'PORT': '3307',
-    }
+    'default': env.db(),
 }
 
 
@@ -128,9 +146,9 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-]
+# Orígenes autorizados a llamar a la API desde el navegador.
+# Nunca usar CORS_ALLOW_ALL_ORIGINS: abriría la API a cualquier página.
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

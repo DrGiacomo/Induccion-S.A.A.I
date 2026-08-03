@@ -20,6 +20,10 @@ Django==6.0.5
 djangorestframework==3.17.1
 django-cors-headers==4.9.0
 
+# Lee la configuración desde el archivo .env (paso P0.3). Sin esto el
+# proyecto no arranca: settings.py ya no contiene ningún valor propio.
+django-environ==0.14.0
+
 
 # ── Base de datos ──────────────────────────────────────────────
 # ⚠️ TEMPORAL — los tres desaparecen en P0.4 (migración a PostgreSQL,
